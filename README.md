@@ -1,0 +1,1 @@
+# wdk-protocol-bridge-usdt0-evm
