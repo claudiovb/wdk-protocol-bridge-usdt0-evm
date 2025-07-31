@@ -22,7 +22,7 @@ import { Address } from '@ton/core'
 
 import { TronWeb } from 'tronweb'
 
-import { AbstractBridgeProtocol } from '@wdk/wallet/protocols'
+import { BridgeProtocol } from '@wdk/wallet/protocols'
 
 import { WalletAccountEvmErc4337 } from '@wdk/wallet-evm-erc-4337'
 
@@ -35,7 +35,7 @@ import { WalletAccountEvmErc4337 } from '@wdk/wallet-evm-erc-4337'
  * @property {string} [approvalHash] - The transaction hash of the approval transaction, if applicable.
  */
 
-export const CHAIN_CONFIG = {
+const CHAIN_CONFIG = {
   ethereum: {
     oftContract: '0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee',
     legacyMeshContract: '0x811ed79dB9D34E83BDB73DF6c3e07961Cfb0D5c0',
@@ -84,11 +84,16 @@ const OFT_ABI = [
   'event OFTReceived(bytes32 indexed guid, uint32 srcEid, address indexed toAddress, uint256 amountReceivedLD)'
 ]
 
+const TRANSACTION_VALUE_HELPER_ABI = [
+  'function quoteSend((uint32 dstEid, bytes32 to, uint256 amountLD, uint256 minAmountLD, bytes extraOptions, bytes composeMsg, bytes oftCmd) _sendParam, (uint256 nativeFee, uint256 lzTokenFee) _fee) view returns (uint256 totalAmount)',
+  'function send(address _oft, (uint32 dstEid, bytes32 to, uint256 amountLD, uint256 minAmountLD, bytes extraOptions, bytes composeMsg, bytes oftCmd) _sendParam, (uint256 nativeFee, uint256 lzTokenFee) _fee) payable returns ((bytes32 guid, uint64 nonce, (uint256 nativeFee, uint256 lzTokenFee) fee) msgReceipt, (uint256 amountSentLD, uint256 amountReceivedLD) oftReceipt)'
+]
+
 const ERC20_ABI = [
   'function approve(address spender, uint256 amount) returns (bool)'
 ]
 
-export default class Usdt0ProtocolEvm extends AbstractBridgeProtocol {
+export default class Usdt0ProtocolEvm extends BridgeProtocol {
   /**
    * Creates a new interface to the usdt0 protocol for evm blockchains.
    *
@@ -118,15 +123,13 @@ export default class Usdt0ProtocolEvm extends AbstractBridgeProtocol {
     }
 
     if (!CHAIN_CONFIG[targetChain]) {
-      throw new Error(`${targetChain} is not supported`)
+      throw new Error(`Taget chain with id ${targetChain} is not supported`)
     }
 
     const sourceChainConfig = CHAIN_CONFIG[sourceChain]
 
     if (
-      sourceChainConfig.oftContract &&
-      targetChain !== 'ton' &&
-      targetChain !== 'tron'
+      sourceChainConfig.oftContract && !['ton', 'tron'].includes(targetChain)
     ) {
       const oftContract = new Contract(sourceChainConfig.oftContract, OFT_ABI, this._provider)
 
@@ -160,6 +163,27 @@ export default class Usdt0ProtocolEvm extends AbstractBridgeProtocol {
     throw new Error(`USDT0 Bridge is not supported for token '${token}' on this chain`)
   }
 
+  async _getTransactionValueHelperContract () {
+    const network = await this._provider.getNetwork()
+    const chainId = Number(network.chainId)
+
+    const [sourceChain] = Object.entries(CHAIN_CONFIG).find(
+      ([, config]) => config.chainId === +chainId
+    ) || []
+
+    if (!CHAIN_CONFIG[sourceChain]) {
+      throw new Error(`${chainId} is not supported`)
+    }
+
+    const sourceChainConfig = CHAIN_CONFIG[sourceChain]
+
+    if (!sourceChainConfig.transactionValueHelper) {
+      throw new Error(`Erc4337 account abstraction is not supported on this chain with id ${chainId}`)
+    }
+
+    return new Contract(sourceChainConfig.transactionValueHelper, TRANSACTION_VALUE_HELPER_ABI, this._provider)
+  }
+
   _buildOftSendParam (targetChain, recipient, amount) {
     const options = Options.newOptions()
 
@@ -188,40 +212,72 @@ export default class Usdt0ProtocolEvm extends AbstractBridgeProtocol {
   async _getBridgeTransactions ({ targetChain, recipient, token, amount }) {
     const oftContract = await this._getOftContractAddress(token, targetChain)
 
-    const tokenContract = new Contract(token, ERC20_ABI, this._account._account.signer)
-
-    const approvalTxData = await tokenContract.interface.encodeFunctionData('approve', [oftContract.target, amount])
+    const tokenContract = new Contract(token, ERC20_ABI)
 
     const sendParam = this._buildOftSendParam(targetChain, recipient, amount)
 
     const refundAddress = await this._account.getAddress()
 
-    const { nativeFee } = await oftContract.quoteSend(sendParam, false)
-    const bridgeFee = Number(nativeFee)
+    if (this._account instanceof WalletAccountEvmErc4337) {
+      const transactionValueHelper = await this._getTransactionValueHelperContract()
 
-    const oftSendData = oftContract.interface.encodeFunctionData('send', [
-      sendParam,
-      {
-        nativeFee: bridgeFee,
-        lzTokenFee: 0
-      },
-      refundAddress
-    ])
+      const { nativeFee, lzTokenFee } = await oftContract.quoteSend(sendParam, false)
 
-    return {
-      approvalTx: {
-        from: await this._account.getAddress(),
-        to: token,
-        data: approvalTxData,
-        value: 0
-      },
-      oftSendTx: {
-        from: await this._account.getAddress(),
-        to: oftContract.target,
-        data: oftSendData,
-        value: bridgeFee
-      },
-      bridgeFee
+      const feeQuoteInTokens = await transactionValueHelper.quoteSend(sendParam, [nativeFee, lzTokenFee])
+
+      const approvalTxData = await tokenContract.interface.encodeFunctionData('approve', [transactionValueHelper.target, Math.ceil(amount + Number(feeQuoteInTokens) * 1.1)])
+
+      const transactionValueHelperSendData = transactionValueHelper.interface.encodeFunctionData('send', [
+        oftContract.target,
+        sendParam,
+        { nativeFee, lzTokenFee: 0 }
+      ])
+
+      return {
+        approvalTx: {
+          from: await this._account.getAddress(),
+          to: token,
+          data: approvalTxData,
+          value: 0
+        },
+        oftSendTx: {
+          from: await this._account.getAddress(),
+          to: transactionValueHelper.target,
+          data: transactionValueHelperSendData,
+          value: 0
+        },
+        bridgeFee: Number(feeQuoteInTokens)
+      }
+    } else {
+      const approvalTxData = await tokenContract.interface.encodeFunctionData('approve', [oftContract.target, amount])
+
+      const { nativeFee } = await oftContract.quoteSend(sendParam, false)
+      const bridgeFee = Number(nativeFee)
+
+      const oftSendData = oftContract.interface.encodeFunctionData('send', [
+        sendParam,
+        {
+          nativeFee: bridgeFee,
+          lzTokenFee: 0
+        },
+        refundAddress
+      ])
+
+      return {
+        approvalTx: {
+          from: await this._account.getAddress(),
+          to: token,
+          data: approvalTxData,
+          value: 0
+        },
+        oftSendTx: {
+          from: await this._account.getAddress(),
+          to: oftContract.target,
+          data: oftSendData,
+          value: bridgeFee
+        },
+        bridgeFee
+      }
     }
   }
 
