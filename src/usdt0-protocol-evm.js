@@ -315,7 +315,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
 
     const { fee, bridgeFee } = await this.quoteBridge(options)
 
-    if (this._config.bridgeMaxFee && fee > this._config.bridgeMaxFee) {
+    if (this._config.bridgeMaxFee && fee + bridgeFee > this._config.bridgeMaxFee) {
       throw new Error('Exceeded maximum fee cost for bridge operation.')
     }
 
