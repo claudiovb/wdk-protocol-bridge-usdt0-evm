@@ -1,4 +1,8 @@
 {
+  "include": [
+    "index.js",
+    "src/**/*.js",
+  ],
   "compilerOptions": {
     "target": "ES2015",
     "module": "NodeNext",
@@ -7,7 +11,7 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "stripInternal": true,
+    "outDir": "./types"
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "@wdk/protocol-bridge-usdt0-evm",
   "version": "1.0.0-beta.1",
-  "description": "A simple package to ...",
+  "description": "A simple package that implements the Usdt0 bridge protocol for the EVM-compatible chains",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -13,16 +13,16 @@
   },
   "dependencies": {
     "@layerzerolabs/lz-v2-utilities": "3.0.114",
-    "@ton/core": "^0.61.0",
+    "@ton/core": "0.61.0",
     "@wdk/wallet": "https://github.com/tetherto/wdk-wallet#develop",
     "@wdk/wallet-evm": "https://github.com/tetherto/wdk-wallet-evm#develop",
     "@wdk/wallet-evm-erc-4337": "https://github.com/tetherto/wdk-wallet-evm-erc-4337#develop",
     "ethers": "6.13.5",
-    "tronweb": "^6.0.3"
+    "tronweb": "6.0.3"
   },
   "devDependencies": {
-    "cross-env": "^10.0.0",
-    "jest": "^30.0.5",
+    "cross-env": "10.0.0",
+    "jest": "30.0.5",
     "standard": "17.1.2",
     "typescript": "5.8.3"
   }

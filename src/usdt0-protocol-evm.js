@@ -32,9 +32,18 @@ import { OFT_ABI, TRANSACTION_VALUE_HELPER_ABI, ERC20_ABI } from './abi.js'
 
 /** @typedef {import('@wdk/wallet/protocols').BridgeOptions} BridgeOptions */
 
+/** @typedef {import('@wdk/wallet-evm').WalletAccountEvm} WalletAccountEvm */
+
+/** @typedef {import('@wdk/wallet-evm-erc-4337').WalletAccountEvmErc4337} WalletAccountEvmErc4337 */
+/** @typedef {import('@wdk/wallet-evm-erc-4337').EvmErc4337WalletConfig} EvmErc4337WalletConfig */
+
 /**
  * @typedef {import('@wdk/wallet/protocols').BridgeResult} BridgeResult
- * @property {string} [approvalHash] - The transaction hash of the approval transaction, if applicable.
+ */
+/**
+ * @typedef {BridgeResult & {
+ *   approvalHash: string
+ * }} WalletAccountEvmBridgeResult
  */
 
 const CHAIN_CONFIG = {
@@ -78,14 +87,17 @@ const CHAIN_CONFIG = {
   }
 }
 
+/**
+ * @template {WalletAccountEvm | WalletAccountEvmErc4337} T
+ */
 export default class Usdt0ProtocolEvm extends BridgeProtocol {
   /**
    * Creates a new interface to the usdt0 protocol for evm blockchains.
    *
-   * @param {WalletAccountEvm} account - The wallet account to use to interact with the protocol.
+   * @param {T} account - The wallet account to use to interact with the protocol.
    * @param {BridgeProtocolConfig} config - The bridge protocol configuration.
    */
-  constructor (account, config = {}) {
+  constructor(account, config = {}) {
     super(account, config)
 
     if (account._config.provider) {
@@ -95,7 +107,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
     }
   }
 
-  async _getOftContractAddress (token, targetChain) {
+  async _getOftContractAddress(token, targetChain) {
     const network = await this._provider.getNetwork()
 
     const chainId = Number(network.chainId)
@@ -149,7 +161,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
     throw new Error(`USDT0 Bridge is not supported for token '${token}' on this chain`)
   }
 
-  async _getTransactionValueHelperContract () {
+  async _getTransactionValueHelperContract() {
     const network = await this._provider.getNetwork()
     const chainId = Number(network.chainId)
 
@@ -170,7 +182,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
     return new Contract(sourceChainConfig.transactionValueHelper, TRANSACTION_VALUE_HELPER_ABI, this._provider)
   }
 
-  _buildOftSendParam (targetChain, recipient, amount) {
+  _buildOftSendParam(targetChain, recipient, amount) {
     const options = Options.newOptions()
 
     let to
@@ -195,7 +207,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
     }
   }
 
-  async _getBridgeTransactions ({ targetChain, recipient, token, amount }) {
+  async _getBridgeTransactions({ targetChain, recipient, token, amount }) {
     const oftContract = await this._getOftContractAddress(token, targetChain)
 
     const tokenContract = new Contract(token, ERC20_ABI)
@@ -273,7 +285,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
    * @param {BridgeOptions} options - The bridge's options.
    * @returns {Promise<Omit<BridgeResult, 'hash'>>} The quote result with fee estimates.
    */
-  async quoteBridge (options) {
+  async quoteBridge(options) {
     if (!this._provider) {
       throw new Error('The wallet must be connected to a provider to quote bridge.')
     }
@@ -302,9 +314,10 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
    * Bridges a token to a different blockchain.
    *
    * @param {BridgeOptions} options - The bridge's options.
-   * @returns {Promise<BridgeResult>} The bridge's result.
+   * @param {Pick<BridgeProtocolConfig, 'bridgeMaxFee'> & (T extends WalletAccountEvmErc4337 ? Pick<EvmErc4337WalletConfig, 'paymasterToken'> : {})} [config] - If set, overrides the 'bridgeMaxFee' and 'paymasterToken' options defined in the manager configuration.
+   * @returns {Promise<T extends WalletAccountEvm ? WalletAccountEvmBridgeResult : BridgeResult>} The bridge's result.
    */
-  async bridge (options) {
+  async bridge(options, config) {
     if (!(this._account instanceof WalletAccountEvm) && !(this._account instanceof WalletAccountEvmErc4337)) {
       throw new Error('Bridge operation cannot be performed with a read-only account.')
     }
@@ -315,14 +328,18 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
 
     const { fee, bridgeFee } = await this.quoteBridge(options)
 
-    if (this._config.bridgeMaxFee && fee + bridgeFee > this._config.bridgeMaxFee) {
+    const { bridgeMaxFee, paymasterToken } = config ?? this._config
+
+    if (bridgeMaxFee && fee + bridgeFee > bridgeMaxFee) {
       throw new Error('Exceeded maximum fee cost for bridge operation.')
     }
 
     const { approvalTx, oftSendTx } = await this._getBridgeTransactions(options)
 
     if (this._account instanceof WalletAccountEvmErc4337) {
-      const { hash } = await this._account.sendTransaction([approvalTx, oftSendTx])
+      const sendTransactionConfig = paymasterToken ? { paymasterToken } : undefined
+
+      const { hash } = await this._account.sendTransaction([approvalTx, oftSendTx], sendTransactionConfig)
 
       return {
         hash,
