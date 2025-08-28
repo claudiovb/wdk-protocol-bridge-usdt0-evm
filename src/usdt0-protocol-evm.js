@@ -29,22 +29,18 @@ import { WalletAccountEvmErc4337 } from '@wdk/wallet-evm-erc-4337'
 import { OFT_ABI, TRANSACTION_VALUE_HELPER_ABI, ERC20_ABI } from './abi.js'
 
 /** @typedef {import('@wdk/wallet/protocols').BridgeProtocolConfig} BridgeProtocolConfig */
-
 /** @typedef {import('@wdk/wallet/protocols').BridgeOptions} BridgeOptions */
-
-/** @typedef {import('@wdk/wallet-evm').WalletAccountEvm} WalletAccountEvm */
-
-/** @typedef {import('@wdk/wallet-evm-erc-4337').WalletAccountEvmErc4337} WalletAccountEvmErc4337 */
+/** @typedef {import('@wdk/wallet/protocols').BridgeResult} BridgeResult */
 /** @typedef {import('@wdk/wallet-evm-erc-4337').EvmErc4337WalletConfig} EvmErc4337WalletConfig */
 
-/**
- * @typedef {import('@wdk/wallet/protocols').BridgeResult} BridgeResult
- */
 /**
  * @typedef {BridgeResult & {
  *   approvalHash: string
  * }} WalletAccountEvmBridgeResult
  */
+
+const FEE_TOLERANCE = 0.999 // 0.1% fee tolerance
+const ERC4337_FEE_BUFFER = 1.1 // 10% buffer for ERC4337 fee estimation
 
 const CHAIN_CONFIG = {
   ethereum: {
@@ -107,177 +103,6 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
     }
   }
 
-  async _getOftContractAddress(token, targetChain) {
-    const network = await this._provider.getNetwork()
-
-    const chainId = Number(network.chainId)
-
-    const [sourceChain] = Object.entries(CHAIN_CONFIG).find(
-      ([, config]) => config.chainId === +chainId
-    ) || []
-
-    if (!CHAIN_CONFIG[sourceChain]) {
-      throw new Error(`${chainId} is not supported`)
-    }
-
-    if (!CHAIN_CONFIG[targetChain]) {
-      throw new Error(`Taget chain with id ${targetChain} is not supported`)
-    }
-
-    const sourceChainConfig = CHAIN_CONFIG[sourceChain]
-
-    if (
-      sourceChainConfig.oftContract && !['ton', 'tron'].includes(targetChain)
-    ) {
-      const oftContract = new Contract(sourceChainConfig.oftContract, OFT_ABI, this._provider)
-
-      const oftToken = await oftContract.token()
-
-      if (oftToken.toLowerCase() === token.toLowerCase()) {
-        return oftContract
-      }
-    }
-
-    if (sourceChainConfig.legacyMeshContract) {
-      const legacyMeshContract = new Contract(sourceChainConfig.legacyMeshContract, OFT_ABI, this._provider)
-
-      const legacyMeshToken = await legacyMeshContract.token()
-
-      if (legacyMeshToken.toLowerCase() === token.toLowerCase()) {
-        return legacyMeshContract
-      }
-    }
-
-    if (sourceChainConfig.xautOftContract) {
-      const xautContract = new Contract(sourceChainConfig.xautOftContract, OFT_ABI, this._provider)
-
-      const xautToken = await xautContract.token()
-
-      if (xautToken.toLowerCase() === token.toLowerCase()) {
-        return xautContract
-      }
-    }
-
-    throw new Error(`USDT0 Bridge is not supported for token '${token}' on this chain`)
-  }
-
-  async _getTransactionValueHelperContract() {
-    const network = await this._provider.getNetwork()
-    const chainId = Number(network.chainId)
-
-    const [sourceChain] = Object.entries(CHAIN_CONFIG).find(
-      ([, config]) => config.chainId === +chainId
-    ) || []
-
-    if (!CHAIN_CONFIG[sourceChain]) {
-      throw new Error(`${chainId} is not supported`)
-    }
-
-    const sourceChainConfig = CHAIN_CONFIG[sourceChain]
-
-    if (!sourceChainConfig.transactionValueHelper) {
-      throw new Error(`Erc4337 account abstraction is not supported on this chain with id ${chainId}`)
-    }
-
-    return new Contract(sourceChainConfig.transactionValueHelper, TRANSACTION_VALUE_HELPER_ABI, this._provider)
-  }
-
-  _buildOftSendParam(targetChain, recipient, amount) {
-    const options = Options.newOptions()
-
-    let to
-
-    if (targetChain === 'ton') {
-      to = '0x' + Address.parse(recipient).toRawString().slice(2)
-    } else if (targetChain === 'tron') {
-      const hexAddress = `0x${TronWeb.address.toHex(recipient)}`
-      to = addressToBytes32(hexAddress)
-    } else {
-      to = addressToBytes32(recipient)
-    }
-
-    return {
-      dstEid: CHAIN_CONFIG[targetChain].eid,
-      to,
-      amountLD: amount,
-      minAmountLD: (amount * 999) / 1000, // 0.1% fee tolerance
-      extraOptions: options.toBytes(),
-      composeMsg: getBytes('0x'), // Assuming no composed message
-      oftCmd: getBytes('0x') // Assuming no OFT command is needed
-    }
-  }
-
-  async _getBridgeTransactions({ targetChain, recipient, token, amount }) {
-    const oftContract = await this._getOftContractAddress(token, targetChain)
-
-    const tokenContract = new Contract(token, ERC20_ABI)
-
-    const sendParam = this._buildOftSendParam(targetChain, recipient, amount)
-
-    const refundAddress = await this._account.getAddress()
-
-    if (this._account instanceof WalletAccountEvmErc4337) {
-      const transactionValueHelper = await this._getTransactionValueHelperContract()
-
-      const { nativeFee, lzTokenFee } = await oftContract.quoteSend(sendParam, false)
-
-      const feeQuoteInTokens = await transactionValueHelper.quoteSend(sendParam, [nativeFee, lzTokenFee])
-
-      const approvalTxData = await tokenContract.interface.encodeFunctionData('approve', [transactionValueHelper.target, Math.ceil(amount + Number(feeQuoteInTokens) * 1.1)])
-
-      const transactionValueHelperSendData = transactionValueHelper.interface.encodeFunctionData('send', [
-        oftContract.target,
-        sendParam,
-        { nativeFee, lzTokenFee: 0 }
-      ])
-
-      return {
-        approvalTx: {
-          from: await this._account.getAddress(),
-          to: token,
-          data: approvalTxData,
-          value: 0
-        },
-        oftSendTx: {
-          from: await this._account.getAddress(),
-          to: transactionValueHelper.target,
-          data: transactionValueHelperSendData,
-          value: 0
-        },
-        bridgeFee: Number(feeQuoteInTokens)
-      }
-    } else {
-      const approvalTxData = await tokenContract.interface.encodeFunctionData('approve', [oftContract.target, amount])
-
-      const { nativeFee } = await oftContract.quoteSend(sendParam, false)
-      const bridgeFee = Number(nativeFee)
-
-      const oftSendData = oftContract.interface.encodeFunctionData('send', [
-        sendParam,
-        {
-          nativeFee: bridgeFee,
-          lzTokenFee: 0
-        },
-        refundAddress
-      ])
-
-      return {
-        approvalTx: {
-          from: await this._account.getAddress(),
-          to: token,
-          data: approvalTxData,
-          value: 0
-        },
-        oftSendTx: {
-          from: await this._account.getAddress(),
-          to: oftContract.target,
-          data: oftSendData,
-          value: bridgeFee
-        },
-        bridgeFee
-      }
-    }
-  }
 
   /**
    * Quotes a bridge operation to estimate fees.
@@ -290,22 +115,28 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
       throw new Error('The wallet must be connected to a provider to quote bridge.')
     }
 
+    const { fee, bridgeFee } = await this._quoteBridgeInternal(options)
+    return { fee, bridgeFee }
+  }
+
+  /** @private */
+  async _quoteBridgeInternal(options) {
     const { approvalTx, oftSendTx, bridgeFee } = await this._getBridgeTransactions(options)
 
     if (this._account instanceof WalletAccountEvmErc4337) {
       const { fee } = await this._account.quoteSendTransaction([approvalTx, oftSendTx])
-
-      return {
-        fee,
-        bridgeFee
-      }
+      return { fee, bridgeFee, approvalTx, oftSendTx }
     } else {
-      const { fee: approvalFee } = await this._account.quoteSendTransaction(approvalTx)
-      const { fee: bridgingGasFee } = await this._account.quoteSendTransaction(oftSendTx)
+      const [{ fee: approvalFee }, { fee: bridgingGasFee }] = await Promise.all([
+        this._account.quoteSendTransaction(approvalTx),
+        this._account.quoteSendTransaction(oftSendTx)
+      ])
 
       return {
         fee: approvalFee + bridgingGasFee,
-        bridgeFee
+        bridgeFee,
+        approvalTx,
+        oftSendTx
       }
     }
   }
@@ -319,42 +150,203 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
    */
   async bridge(options, config) {
     if (!(this._account instanceof WalletAccountEvm) && !(this._account instanceof WalletAccountEvmErc4337)) {
-      throw new Error('Bridge operation cannot be performed with a read-only account.')
+      throw new Error('Bridge operation cannot be performed with this account type.')
     }
 
     if (!this._provider) {
       throw new Error('The wallet must be connected to a provider to bridge.')
     }
 
-    const { fee, bridgeFee } = await this.quoteBridge(options)
-
+    const { fee, bridgeFee, approvalTx, oftSendTx } = await this._quoteBridgeInternal(options)
     const { bridgeMaxFee, paymasterToken } = config ?? this._config
 
     if (bridgeMaxFee && fee + bridgeFee > bridgeMaxFee) {
       throw new Error('Exceeded maximum fee cost for bridge operation.')
     }
 
-    const { approvalTx, oftSendTx } = await this._getBridgeTransactions(options)
-
     if (this._account instanceof WalletAccountEvmErc4337) {
       const sendTransactionConfig = paymasterToken ? { paymasterToken } : undefined
-
       const { hash } = await this._account.sendTransaction([approvalTx, oftSendTx], sendTransactionConfig)
 
-      return {
-        hash,
-        fee,
-        bridgeFee
-      }
+      return { hash, fee, bridgeFee }
     } else {
-      const { hash: approvalHash } = await this._account.sendTransaction(approvalTx)
-      const { hash: oftSendHash } = await this._account.sendTransaction(oftSendTx)
+      const [{ hash: approvalHash }, { hash: oftSendHash }] = await Promise.all([
+        this._account.sendTransaction(approvalTx),
+        this._account.sendTransaction(oftSendTx)
+      ])
 
       return {
         hash: oftSendHash,
         fee,
         bridgeFee,
         approvalHash
+      }
+    }
+  }
+
+  /** @private */
+  async _getSourceChainConfig() {
+    const network = await this._provider.getNetwork()
+    const chainId = Number(network.chainId)
+
+    const [sourceChain] = Object.entries(CHAIN_CONFIG).find(
+      ([, config]) => config.chainId === chainId
+    ) || []
+
+    if (!sourceChain || !CHAIN_CONFIG[sourceChain]) {
+      throw new Error(`Chain ID ${chainId} is not supported`)
+    }
+
+    return { sourceChain, sourceChainConfig: CHAIN_CONFIG[sourceChain] }
+  }
+
+  /** @private */
+  _validateTargetChain(targetChain) {
+    if (!CHAIN_CONFIG[targetChain]) {
+      throw new Error(`Target chain '${targetChain}' is not supported`)
+    }
+  }
+
+  /** @private */
+  async _checkContractForToken(contractAddress, token) {
+    if (!contractAddress) return null
+
+    const contract = new Contract(contractAddress, OFT_ABI, this._provider)
+    const contractToken = await contract.token()
+
+    return contractToken.toLowerCase() === token.toLowerCase() ? contract : null
+  }
+
+  /** @private */
+  async _getOftContractAddress(token, targetChain) {
+    this._validateTargetChain(targetChain)
+    const { sourceChainConfig } = await this._getSourceChainConfig()
+
+    const contractTypes = [
+      { key: 'oftContract', condition: () => !['ton', 'tron'].includes(targetChain) },
+      { key: 'legacyMeshContract', condition: () => true },
+      { key: 'xautOftContract', condition: () => true }
+    ]
+
+    for (const { key, condition } of contractTypes) {
+      if (condition() && sourceChainConfig[key]) {
+        const contract = await this._checkContractForToken(sourceChainConfig[key], token)
+        if (contract) return contract
+      }
+    }
+
+    throw new Error(`USDT0 Bridge is not supported for token '${token}' on this chain`)
+  }
+
+  /** @private */
+  async _getTransactionValueHelperContract() {
+    const { sourceChainConfig } = await this._getSourceChainConfig()
+
+    if (!sourceChainConfig.transactionValueHelper) {
+      throw new Error(`ERC4337 account abstraction is not supported on this chain`)
+    }
+
+    return new Contract(sourceChainConfig.transactionValueHelper, TRANSACTION_VALUE_HELPER_ABI, this._provider)
+  }
+
+  /** @private */
+  _buildOftSendParam(targetChain, recipient, amount) {
+    const options = Options.newOptions()
+
+    let to
+    if (targetChain === 'ton') {
+      to = '0x' + Address.parse(recipient).toRawString().slice(2)
+    } else if (targetChain === 'tron') {
+      const hexAddress = `0x${TronWeb.address.toHex(recipient)}`
+      to = addressToBytes32(hexAddress)
+    } else {
+      to = addressToBytes32(recipient)
+    }
+
+    return {
+      dstEid: CHAIN_CONFIG[targetChain].eid,
+      to,
+      amountLD: amount,
+      minAmountLD: amount * FEE_TOLERANCE,
+      extraOptions: options.toBytes(),
+      composeMsg: getBytes('0x'),
+      oftCmd: getBytes('0x')
+    }
+  }
+
+  /** @private */
+  async _createApprovalTxData(tokenContract, spender, amount) {
+    return tokenContract.interface.encodeFunctionData('approve', [spender, amount])
+  }
+
+  /** @private */
+  async _getBridgeTransactions({ targetChain, recipient, token, amount }) {
+    const oftContract = await this._getOftContractAddress(token, targetChain)
+    const tokenContract = new Contract(token, ERC20_ABI)
+    const sendParam = this._buildOftSendParam(targetChain, recipient, amount)
+    const fromAddress = await this._account.getAddress()
+
+    if (this._account instanceof WalletAccountEvmErc4337) {
+      const transactionValueHelper = await this._getTransactionValueHelperContract()
+      const { nativeFee, lzTokenFee } = await oftContract.quoteSend(sendParam, false)
+      const feeQuoteInTokens = await transactionValueHelper.quoteSend(sendParam, [nativeFee, lzTokenFee])
+
+      const approvalAmount = Math.ceil(amount + Number(feeQuoteInTokens) * ERC4337_FEE_BUFFER)
+      const approvalTxData = await this._createApprovalTxData(tokenContract, transactionValueHelper.target, approvalAmount)
+      const transactionValueHelperSendData = transactionValueHelper.interface.encodeFunctionData('send', [
+        oftContract.target,
+        sendParam,
+        { nativeFee, lzTokenFee: 0 }
+      ])
+
+      const approvalTx = {
+        from: fromAddress,
+        to: token,
+        data: approvalTxData,
+        value: 0
+      }
+
+      const oftSendTx = {
+        from: fromAddress,
+        to: transactionValueHelper.target,
+        data: transactionValueHelperSendData,
+        value: 0
+      }
+
+      return {
+        approvalTx,
+        oftSendTx,
+        bridgeFee: Number(feeQuoteInTokens)
+      }
+    } else {
+      const approvalTxData = await this._createApprovalTxData(tokenContract, oftContract.target, amount)
+      const { nativeFee } = await oftContract.quoteSend(sendParam, false)
+      const bridgeFee = Number(nativeFee)
+
+      const oftSendData = oftContract.interface.encodeFunctionData('send', [
+        sendParam,
+        { nativeFee: bridgeFee, lzTokenFee: 0 },
+        fromAddress
+      ])
+
+      const approvalTx = {
+        from: fromAddress,
+        to: token,
+        data: approvalTxData,
+        value: 0
+      }
+
+      const oftSendTx = {
+        from: fromAddress,
+        to: oftContract.target,
+        data: oftSendData,
+        value: bridgeFee
+      }
+
+      return {
+        approvalTx,
+        oftSendTx,
+        bridgeFee
       }
     }
   }

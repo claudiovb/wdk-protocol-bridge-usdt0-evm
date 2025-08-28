@@ -172,7 +172,7 @@ describe('Usdt0ProtocolEvm', () => {
 
         const usdt0ProtocolEvm = new Usdt0ProtocolEvm(readOnlyAccount)
 
-        await expect(usdt0ProtocolEvm.bridge(BRIDGE_OPTIONS_EVM)).rejects.toThrow('Bridge operation cannot be performed with a read-only account.')
+        await expect(usdt0ProtocolEvm.bridge(BRIDGE_OPTIONS_EVM)).rejects.toThrow('Bridge operation cannot be performed with this account type.')
       })
 
       test('should throw if the bridge max fee is exceeded', async () => {
@@ -292,7 +292,7 @@ describe('Usdt0ProtocolEvm', () => {
 
         const usdt0ProtocolEvmErc4337ReadOnly = new Usdt0ProtocolEvm(readOnlyAccountErc4337)
 
-        await expect(usdt0ProtocolEvmErc4337ReadOnly.bridge(BRIDGE_OPTIONS_EVM)).rejects.toThrow('Bridge operation cannot be performed with a read-only account.')
+        await expect(usdt0ProtocolEvmErc4337ReadOnly.bridge(BRIDGE_OPTIONS_EVM)).rejects.toThrow('Bridge operation cannot be performed with this account type.')
       })
     })
 
