@@ -93,7 +93,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
    * @param {T} account - The wallet account to use to interact with the protocol.
    * @param {BridgeProtocolConfig} config - The bridge protocol configuration.
    */
-  constructor(account, config = {}) {
+  constructor (account, config = {}) {
     super(account, config)
 
     if (account._config.provider) {
@@ -103,42 +103,19 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
     }
   }
 
-
   /**
    * Quotes a bridge operation to estimate fees.
    *
    * @param {BridgeOptions} options - The bridge's options.
    * @returns {Promise<Omit<BridgeResult, 'hash'>>} The quote result with fee estimates.
    */
-  async quoteBridge(options) {
+  async quoteBridge (options) {
     if (!this._provider) {
       throw new Error('The wallet must be connected to a provider to quote bridge.')
     }
 
     const { fee, bridgeFee } = await this._quoteBridgeInternal(options)
     return { fee, bridgeFee }
-  }
-
-  /** @private */
-  async _quoteBridgeInternal(options) {
-    const { approvalTx, oftSendTx, bridgeFee } = await this._getBridgeTransactions(options)
-
-    if (this._account instanceof WalletAccountEvmErc4337) {
-      const { fee } = await this._account.quoteSendTransaction([approvalTx, oftSendTx])
-      return { fee, bridgeFee, approvalTx, oftSendTx }
-    } else {
-      const [{ fee: approvalFee }, { fee: bridgingGasFee }] = await Promise.all([
-        this._account.quoteSendTransaction(approvalTx),
-        this._account.quoteSendTransaction(oftSendTx)
-      ])
-
-      return {
-        fee: approvalFee + bridgingGasFee,
-        bridgeFee,
-        approvalTx,
-        oftSendTx
-      }
-    }
   }
 
   /**
@@ -148,7 +125,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
    * @param {Pick<BridgeProtocolConfig, 'bridgeMaxFee'> & (T extends WalletAccountEvmErc4337 ? Pick<EvmErc4337WalletConfig, 'paymasterToken'> : {})} [config] - If set, overrides the 'bridgeMaxFee' and 'paymasterToken' options defined in the manager configuration.
    * @returns {Promise<T extends WalletAccountEvm ? WalletAccountEvmBridgeResult : BridgeResult>} The bridge's result.
    */
-  async bridge(options, config) {
+  async bridge (options, config) {
     if (!(this._account instanceof WalletAccountEvm) && !(this._account instanceof WalletAccountEvmErc4337)) {
       throw new Error('Bridge operation cannot be performed with this account type.')
     }
@@ -185,7 +162,29 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
   }
 
   /** @private */
-  async _getSourceChainConfig() {
+  async _quoteBridgeInternal (options) {
+    const { approvalTx, oftSendTx, bridgeFee } = await this._getBridgeTransactions(options)
+
+    if (this._account instanceof WalletAccountEvmErc4337) {
+      const { fee } = await this._account.quoteSendTransaction([approvalTx, oftSendTx])
+      return { fee, bridgeFee, approvalTx, oftSendTx }
+    } else {
+      const [{ fee: approvalFee }, { fee: bridgingGasFee }] = await Promise.all([
+        this._account.quoteSendTransaction(approvalTx),
+        this._account.quoteSendTransaction(oftSendTx)
+      ])
+
+      return {
+        fee: approvalFee + bridgingGasFee,
+        bridgeFee,
+        approvalTx,
+        oftSendTx
+      }
+    }
+  }
+
+  /** @private */
+  async _getSourceChainConfig () {
     const network = await this._provider.getNetwork()
     const chainId = Number(network.chainId)
 
@@ -201,14 +200,14 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
   }
 
   /** @private */
-  _validateTargetChain(targetChain) {
+  _validateTargetChain (targetChain) {
     if (!CHAIN_CONFIG[targetChain]) {
       throw new Error(`Target chain '${targetChain}' is not supported`)
     }
   }
 
   /** @private */
-  async _checkContractForToken(contractAddress, token) {
+  async _checkContractForToken (contractAddress, token) {
     if (!contractAddress) return null
 
     const contract = new Contract(contractAddress, OFT_ABI, this._provider)
@@ -218,7 +217,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
   }
 
   /** @private */
-  async _getOftContractAddress(token, targetChain) {
+  async _getOftContractAddress (token, targetChain) {
     this._validateTargetChain(targetChain)
     const { sourceChainConfig } = await this._getSourceChainConfig()
 
@@ -239,18 +238,18 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
   }
 
   /** @private */
-  async _getTransactionValueHelperContract() {
+  async _getTransactionValueHelperContract () {
     const { sourceChainConfig } = await this._getSourceChainConfig()
 
     if (!sourceChainConfig.transactionValueHelper) {
-      throw new Error(`ERC4337 account abstraction is not supported on this chain`)
+      throw new Error('ERC4337 account abstraction is not supported on this chain')
     }
 
     return new Contract(sourceChainConfig.transactionValueHelper, TRANSACTION_VALUE_HELPER_ABI, this._provider)
   }
 
   /** @private */
-  _buildOftSendParam(targetChain, recipient, amount) {
+  _buildOftSendParam (targetChain, recipient, amount) {
     const options = Options.newOptions()
 
     let to
@@ -275,12 +274,12 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
   }
 
   /** @private */
-  async _createApprovalTxData(tokenContract, spender, amount) {
+  async _createApprovalTxData (tokenContract, spender, amount) {
     return tokenContract.interface.encodeFunctionData('approve', [spender, amount])
   }
 
   /** @private */
-  async _getBridgeTransactions({ targetChain, recipient, token, amount }) {
+  async _getBridgeTransactions ({ targetChain, recipient, token, amount }) {
     const oftContract = await this._getOftContractAddress(token, targetChain)
     const tokenContract = new Contract(token, ERC20_ABI)
     const sendParam = this._buildOftSendParam(targetChain, recipient, amount)
