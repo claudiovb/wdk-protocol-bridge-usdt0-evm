@@ -18,6 +18,6 @@
 
 /** @typedef {import('@wdk/wallet/protocols').BridgeOptions} BridgeOptions */
 
-/** @typedef {import('@wdk/wallet/protocols').BridgeResult} BridgeResult */
+/** @typedef {import('./src/usdt0-protocol-evm.js').Usdt0BridgeResult} Usdt0BridgeResult */
 
 export { default } from './src/usdt0-protocol-evm.js'

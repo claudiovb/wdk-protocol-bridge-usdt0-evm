@@ -1,11 +1,18 @@
 {
   "name": "@wdk/protocol-bridge-usdt0-evm",
   "version": "1.0.0-beta.1",
-  "description": "A simple package that implements the Usdt0 bridge protocol for the EVM-compatible chains",
+  "description": "A simple package that lets @wdk/wallet-evm and wallet-evm-erc-4337 wallet accounts interact with the usdt0 protocol.",
+  "keywords": ["wdk", "protocol", "bridge", "usdt0", "ethereum", "erc-4337"],
+  "author": "Tether",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tetherto/wdk-protocol-bridge-usdt0-evm.git"
+  },
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build:types": "rimraf *.d.ts **/*.d.ts; tsc",
+    "build:types": "tsc",
     "lint": "standard",
     "lint:fix": "standard --fix",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
@@ -14,9 +21,9 @@
   "dependencies": {
     "@layerzerolabs/lz-v2-utilities": "3.0.114",
     "@ton/core": "0.61.0",
-    "@wdk/wallet": "https://github.com/tetherto/wdk-wallet#develop",
-    "@wdk/wallet-evm": "https://github.com/tetherto/wdk-wallet-evm#develop",
-    "@wdk/wallet-evm-erc-4337": "https://github.com/tetherto/wdk-wallet-evm-erc-4337#develop",
+    "@wdk/wallet": "https://github.com/davi0kprogramsthings/wdk-wallet#develop",
+    "@wdk/wallet-evm": "https://github.com/davi0kprogramsthings/wdk-wallet-evm#develop",
+    "@wdk/wallet-evm-erc-4337": "https://github.com/davi0kprogramsthings/wdk-wallet-evm-erc-4337#develop",
     "ethers": "6.13.5",
     "tronweb": "6.0.3"
   },
@@ -25,5 +32,11 @@
     "jest": "30.0.5",
     "standard": "17.1.2",
     "typescript": "5.8.3"
+  },
+  "standard": {
+    "ignore": [
+      "bare.js",
+      "tests/**/*.js"
+    ]
   }
 }
