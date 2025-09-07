@@ -291,6 +291,10 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
       throw new Error(`Source chain with id '${configuration.chainId}' not supported.`)
     }
 
+    if (configuration.chainId === BLOCKCHAINS[targetChain].chainId) {
+      throw new Error(`The target chain cannot be equal to the source chain.`)
+    }
+
     for (const key of ['oftContract', 'legacyMeshContract', 'xautOftContract']) {
       if (key === 'oftContract' && ['ton', 'tron'].includes(targetChain)) {
         continue
