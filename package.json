@@ -1,0 +1,53 @@
+{
+  "name": "@wdk/protocol-bridge-usdt0-evm",
+  "version": "1.0.0-beta.1",
+  "description": "A simple package that lets @wdk/wallet-evm and wallet-evm-erc-4337 wallet accounts interact with the usdt0 protocol.",
+  "keywords": ["wdk", "protocol", "bridge", "usdt0", "ethereum", "erc-4337"],
+  "author": "Tether",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/tetherto/wdk-protocol-bridge-usdt0-evm.git"
+  },
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build:types": "tsc",
+    "lint": "standard",
+    "lint:fix": "standard --fix",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:coverage": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --coverage"
+  },
+  "dependencies": {
+    "@layerzerolabs/lz-v2-utilities": "3.0.114",
+    "@ton/core": "0.61.0",
+    "@wdk/wallet": "https://github.com/davi0kprogramsthings/wdk-wallet#develop",
+    "@wdk/wallet-evm": "https://github.com/davi0kprogramsthings/wdk-wallet-evm#develop",
+    "@wdk/wallet-evm-erc-4337": "https://github.com/davi0kprogramsthings/wdk-wallet-evm-erc-4337#develop",
+    "bare-wdk-runtime": "2.0.1",
+    "ethers": "6.13.5",
+    "tronweb": "6.0.3"
+  },
+  "devDependencies": {
+    "cross-env": "10.0.0",
+    "jest": "30.0.5",
+    "standard": "17.1.2",
+    "typescript": "5.8.3"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "bare": "./bare.js",
+      "default": "./index.js"
+    },
+    "./package": {
+      "default": "./package.json"
+    }
+  },
+  "standard": {
+    "ignore": [
+      "bare.js",
+      "tests/**/*.js"
+    ]
+  }
+}
