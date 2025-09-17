@@ -37,7 +37,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
      *   wallet account, overrides the 'paymasterToken' option defined in its configuration.
      * @returns {Promise<Omit<BridgeResult, 'hash' | 'approveHash'>>} The bridge's quotes.
      */
-    quoteBridge(options: BridgeOptions, config?: Pick<EvmErc4337WalletConfig, "paymasterToken">): Promise<Omit<BridgeResult, "hash" | "approveHash">>;
+    quoteBridge(options: BridgeOptions, config?: Pick<EvmErc4337WalletConfig, "paymasterToken">): Promise<Omit<BridgeResult, "hash" | "approveHash" | "resetAllowanceHash">>;
     /** @private */
     private _getChainId;
     /** @private */

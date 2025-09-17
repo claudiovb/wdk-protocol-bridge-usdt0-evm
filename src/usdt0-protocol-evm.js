@@ -192,7 +192,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
    * @param {BridgeOptions} options - The bridge's options.
    * @param {Pick<EvmErc4337WalletConfig, 'paymasterToken'>} [config] - If the protocol has been initialized with an erc-4337
    *   wallet account, overrides the 'paymasterToken' option defined in its configuration.
-   * @returns {Promise<Omit<BridgeResult, 'hash' | 'approveHash'>>} The bridge's quotes.
+   * @returns {Promise<Omit<BridgeResult, 'hash' | 'approveHash' | 'resetAllowanceHash'>>} The bridge's quotes.
    */
   async quoteBridge (options, config) {
     if (!this._provider) {
