@@ -33,7 +33,7 @@ import { OFT_ABI, TRANSACTION_VALUE_HELPER_ABI, ERC20_ABI } from './abi.js'
 /** @typedef {import('@tetherto/wdk-wallet-evm-erc-4337').EvmErc4337WalletConfig} EvmErc4337WalletConfig */
 
 /**
- * @typedef {Object} Usdt0BridgeResult
+ * @typedef {Object} BridgeResult
  * @property {string} hash - The hash of the swap operation.
  * @property {bigint} fee - The gas cost.
  * @property {bigint} bridgeFee - The amount of native tokens paid to the bridge protocol.
@@ -126,7 +126,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
    * @param {Pick<EvmErc4337WalletConfig, 'paymasterToken'> & Pick<BridgeProtocolConfig, 'bridgeMaxFee'>} [config] - If the protocol has
    *   been initialized with an erc-4337 wallet account, overrides the 'paymasterToken' option defined in its configuration and the
    *   'bridgeMaxFee' option defined in the protocol configuration.
-   * @returns {Promise<Usdt0BridgeResult>} The bridge's result.
+   * @returns {Promise<BridgeResult>} The bridge's result.
    */
   async bridge (options, config) {
     if (!(this._account instanceof WalletAccountEvm) && !(this._account instanceof WalletAccountEvmErc4337)) {
@@ -176,7 +176,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
    * @param {BridgeOptions} options - The bridge's options.
    * @param {Pick<EvmErc4337WalletConfig, 'paymasterToken'>} [config] - If the protocol has been initialized with an erc-4337
    *   wallet account, overrides the 'paymasterToken' option defined in its configuration.
-   * @returns {Promise<Omit<Usdt0BridgeResult, 'hash' | 'approveHash'>>} The bridge's quotes.
+   * @returns {Promise<Omit<BridgeResult, 'hash' | 'approveHash'>>} The bridge's quotes.
    */
   async quoteBridge (options, config) {
     if (!this._provider) {

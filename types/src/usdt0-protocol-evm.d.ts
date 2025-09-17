@@ -26,18 +26,18 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
      * @param {Pick<EvmErc4337WalletConfig, 'paymasterToken'> & Pick<BridgeProtocolConfig, 'bridgeMaxFee'>} [config] - If the protocol has
      *   been initialized with an erc-4337 wallet account, overrides the 'paymasterToken' option defined in its configuration and the
      *   'bridgeMaxFee' option defined in the protocol configuration.
-     * @returns {Promise<Usdt0BridgeResult>} The bridge's result.
+     * @returns {Promise<BridgeResult>} The bridge's result.
      */
-    bridge(options: BridgeOptions, config?: Pick<EvmErc4337WalletConfig, "paymasterToken"> & Pick<BridgeProtocolConfig, "bridgeMaxFee">): Promise<Usdt0BridgeResult>;
+    bridge(options: BridgeOptions, config?: Pick<EvmErc4337WalletConfig, "paymasterToken"> & Pick<BridgeProtocolConfig, "bridgeMaxFee">): Promise<BridgeResult>;
     /**
      * Quotes the costs of a bridge operation.
      *
      * @param {BridgeOptions} options - The bridge's options.
      * @param {Pick<EvmErc4337WalletConfig, 'paymasterToken'>} [config] - If the protocol has been initialized with an erc-4337
      *   wallet account, overrides the 'paymasterToken' option defined in its configuration.
-     * @returns {Promise<Omit<Usdt0BridgeResult, 'hash' | 'approveHash'>>} The bridge's quotes.
+     * @returns {Promise<Omit<BridgeResult, 'hash' | 'approveHash'>>} The bridge's quotes.
      */
-    quoteBridge(options: BridgeOptions, config?: Pick<EvmErc4337WalletConfig, "paymasterToken">): Promise<Omit<Usdt0BridgeResult, "hash" | "approveHash">>;
+    quoteBridge(options: BridgeOptions, config?: Pick<EvmErc4337WalletConfig, "paymasterToken">): Promise<Omit<BridgeResult, "hash" | "approveHash">>;
     /** @private */
     private _getChainId;
     /** @private */
@@ -55,7 +55,7 @@ export type BridgeProtocolConfig = import("@tetherto/wdk-wallet/protocols").Brid
 export type BridgeOptions = import("@tetherto/wdk-wallet/protocols").BridgeOptions;
 export type WalletAccountReadOnlyEvm = import("@tetherto/wdk-wallet-evm").WalletAccountReadOnlyEvm;
 export type EvmErc4337WalletConfig = import("@tetherto/wdk-wallet-evm-erc-4337").EvmErc4337WalletConfig;
-export type Usdt0BridgeResult = {
+export type BridgeResult = {
     /**
      * - The hash of the swap operation.
      */
