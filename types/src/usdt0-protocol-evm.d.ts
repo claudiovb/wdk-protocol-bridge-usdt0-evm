@@ -71,9 +71,16 @@ export type BridgeResult = {
     /**
      * - If the protocol has been initialized with a standard wallet account, this field will contain the hash
      * of the approve call to allow usdt0 to transfer the bridged tokens. If the protocol has been initialized with an erc-4337 wallet account,
-     * this field will be undefined (since the approve call will be bundled in the user operation with hash {@link ParaSwapResult#hash}).
+     * this field will be undefined (since the approve call will be bundled in the user operation with hash {@link BridgeResult#hash}).
      */
     approveHash?: string;
+    /**
+     * - If the bridge operation has been performed on ethereum mainnet by bridging usdt tokens, this field will
+     * contain the hash of the approve call that resets the allowance of the usdt0 protocol to zero (due to the usdt allowance reset requirement).
+     * If the protocol has been initialized with an erc-4337 wallet account, this field will be undefined (since the approve call will be bundled in
+     * the user operation with hash {@link BridgeResult#hash}).
+     */
+    resetAllowanceHash?: string;
 };
 import { BridgeProtocol } from '@wdk/wallet/protocols';
 import { WalletAccountReadOnlyEvmErc4337 } from '@wdk/wallet-evm-erc-4337';
