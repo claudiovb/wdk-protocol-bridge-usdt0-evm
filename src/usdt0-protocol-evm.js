@@ -23,34 +23,17 @@ import { JsonRpcProvider, BrowserProvider, Contract, getBytes } from 'ethers'
 import { Address } from '@ton/core'
 import { TronWeb } from 'tronweb'
 
-import { OFT_ABI, TRANSACTION_VALUE_HELPER_ABI, ERC20_ABI } from './abi.js'
+import { OFT_ABI, TRANSACTION_VALUE_HELPER_ABI } from './abi.js'
 
 /** @typedef {import('@tetherto/wdk-wallet/protocols').BridgeProtocolConfig} BridgeProtocolConfig */
 /** @typedef {import('@tetherto/wdk-wallet/protocols').BridgeOptions} BridgeOptions */
+/** @typedef {import('@tetherto/wdk-wallet/protocols').BridgeResult} BridgeResult */
 
 /** @typedef {import('@tetherto/wdk-wallet-evm').WalletAccountReadOnlyEvm} WalletAccountReadOnlyEvm */
 
 /** @typedef {import('@tetherto/wdk-wallet-evm-erc-4337').EvmErc4337WalletConfig} EvmErc4337WalletConfig */
 
-/**
- * @typedef {Object} BridgeResult
- * @property {string} hash - The hash of the swap operation.
- * @property {bigint} fee - The gas cost.
- * @property {bigint} bridgeFee - The amount of native tokens paid to the bridge protocol.
- * @property {string} [approveHash] - If the protocol has been initialized with a standard wallet account, this field will contain the hash
- *   of the approve call to allow usdt0 to transfer the bridged tokens. If the protocol has been initialized with an erc-4337 wallet account,
- *   this field will be undefined (since the approve call will be bundled in the user operation with hash {@link BridgeResult#hash}).
- * @property {string} [resetAllowanceHash] - If the bridge operation has been performed on ethereum mainnet by bridging usdt tokens, this field will
- *   contain the hash of the approve call that resets the allowance of the usdt0 protocol to zero (due to the usdt allowance reset requirement).
- *   If the protocol has been initialized with an erc-4337 wallet account, this field will be undefined (since the approve call will be bundled in
- *   the user operation with hash {@link BridgeResult#hash}).
- */
-
 const FEE_TOLERANCE = 999n
-
-const ERC_4337_FEE_BUFFER = 1_100n
-
-const USDT = '0xdac17f958d2ee523a2206206994597c13d831ec7'
 
 const BLOCKCHAINS = {
   ethereum: {
@@ -128,6 +111,8 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
   /**
    * Bridges a token to a different blockchain.
    *
+   * Users must first approve the necessary amount of tokens to the usdt0 protocol using the {@link WalletAccountEvm#approve} or the {@link WalletAccountEvmErc4337#approve} method.
+   *
    * @param {BridgeOptions} options - The bridge's options.
    * @param {Pick<EvmErc4337WalletConfig, 'paymasterToken'> & Pick<BridgeProtocolConfig, 'bridgeMaxFee'>} [config] - If the protocol has
    *   been initialized with an erc-4337 wallet account, overrides the 'paymasterToken' option defined in its configuration and the
@@ -143,84 +128,59 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
       throw new Error('The wallet must be connected to a provider in order to perform bridge operations.')
     }
 
-    const { resetAllowanceTx, approveTx, oftTx, bridgeFee } = await this._getBridgeTransactions({ ...options, amount: BigInt(options.amount) })
+    const { oftTx, bridgeFee } = await this._getBridgeTransactions({ ...options, amount: BigInt(options.amount) })
 
     if (this._account instanceof WalletAccountEvmErc4337) {
       const { bridgeMaxFee } = config ?? this._config
 
-      const transactions = resetAllowanceTx ? [resetAllowanceTx, approveTx, oftTx] : [approveTx, oftTx]
-
-      const { fee } = await this._account.quoteSendTransaction(transactions, config)
+      const { fee } = await this._account.quoteSendTransaction([oftTx], config)
 
       if (bridgeMaxFee !== undefined && fee + bridgeFee >= bridgeMaxFee) {
         throw new Error('Exceeded maximum fee cost for bridge operation.')
       }
 
-      const { hash } = await this._account.sendTransaction(transactions, config)
+      const { hash } = await this._account.sendTransaction([oftTx], config)
 
       return { hash, fee, bridgeFee }
     }
 
-    const { fee: resetAllowanceFee } = resetAllowanceTx
-      ? await this._account.quoteSendTransaction(resetAllowanceTx)
-      : { fee: 0n }
-
-    const { fee: approveFee } = await this._account.quoteSendTransaction(approveTx)
-
-    const { fee: oftFee } = await this._account.quoteSendTransaction(oftTx)
-
-    const fee = resetAllowanceFee + approveFee + oftFee
+    const { fee } = await this._account.quoteSendTransaction(oftTx)
 
     if (this._config.bridgeMaxFee !== undefined && fee + bridgeFee >= this._config.bridgeMaxFee) {
       throw new Error('Exceeded maximum fee cost for bridge operation.')
     }
 
-    const { hash: resetAllowanceHash } = resetAllowanceTx
-      ? await this._account.sendTransaction(resetAllowanceTx)
-      : { hash: undefined }
-
-    const { hash: approveHash } = await this._account.sendTransaction(approveTx)
-
     const { hash } = await this._account.sendTransaction(oftTx)
 
-    return { resetAllowanceHash, approveHash, hash, fee, bridgeFee }
+    return { hash, fee, bridgeFee }
   }
 
   /**
    * Quotes the costs of a bridge operation.
    *
+   * Users must first approve the necessary amount of tokens to the usdt0 protocol using the {@link WalletAccountEvm#approve} or the {@link WalletAccountEvmErc4337#approve} method.
+   *
    * @param {BridgeOptions} options - The bridge's options.
    * @param {Pick<EvmErc4337WalletConfig, 'paymasterToken'>} [config] - If the protocol has been initialized with an erc-4337
    *   wallet account, overrides the 'paymasterToken' option defined in its configuration.
-   * @returns {Promise<Omit<BridgeResult, 'hash' | 'approveHash' | 'resetAllowanceHash'>>} The bridge's quotes.
+   * @returns {Promise<Omit<BridgeResult, 'hash'>>} The bridge's quotes.
    */
   async quoteBridge (options, config) {
     if (!this._provider) {
       throw new Error('The wallet must be connected to a provider in order to quote bridge operations.')
     }
 
-    const { resetAllowanceTx, approveTx, oftTx, bridgeFee } = await this._getBridgeTransactions({ ...options, amount: BigInt(options.amount) })
+    const { oftTx, bridgeFee } = await this._getBridgeTransactions({ ...options, amount: BigInt(options.amount) })
 
     if (this._account instanceof WalletAccountReadOnlyEvmErc4337) {
-      const transactions = resetAllowanceTx ? [resetAllowanceTx, approveTx, oftTx] : [approveTx, oftTx]
-
-      const { fee } = await this._account.quoteSendTransaction(transactions, config)
+      const { fee } = await this._account.quoteSendTransaction([oftTx], config)
 
       return { fee, bridgeFee }
     }
 
-    const { fee: resetAllowanceFee } = resetAllowanceTx
-      ? await this._account.quoteSendTransaction(resetAllowanceTx)
-      : { fee: 0n }
+    const { fee } = await this._account.quoteSendTransaction(oftTx)
 
-    const { fee: approveFee } = await this._account.quoteSendTransaction(approveTx)
-
-    const { fee: oftFee } = await this._account.quoteSendTransaction(oftTx)
-
-    return {
-      fee: resetAllowanceFee + approveFee + oftFee,
-      bridgeFee
-    }
+    return { fee, bridgeFee }
   }
 
   /** @private */
@@ -236,11 +196,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
 
   /** @private */
   async _getBridgeTransactions ({ targetChain, recipient, token, amount }) {
-    const chainId = await this._getChainId()
-
     const address = await this._account.getAddress()
-
-    const tokenContract = new Contract(token, ERC20_ABI)
 
     const oftContract = await this._getOftContract(targetChain, token)
 
@@ -257,17 +213,6 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
 
       const bridgeFee = await transactionValueHelper.quoteSend(sendParam, [nativeFee, lzTokenFee])
 
-      const approveAmount = amount + (bridgeFee * ERC_4337_FEE_BUFFER / 1_000n)
-
-      // TO-DO: once erc-4337 bridge operations will be supported by the ethereum mainnet, we'll need to send
-      //        the reset allowance transaction here too.
-
-      const approveTx = {
-        to: token,
-        value: 0,
-        data: tokenContract.interface.encodeFunctionData('approve', [transactionValueHelper.target, approveAmount])
-      }
-
       const fee = { nativeFee, lzTokenFee: 0 }
 
       const oftTx = {
@@ -276,30 +221,10 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
         data: transactionValueHelper.interface.encodeFunctionData('send', [oftContract.target, sendParam, fee])
       }
 
-      return {
-        approveTx,
-        oftTx,
-        bridgeFee
-      }
+      return { oftTx, bridgeFee }
     }
 
     const { nativeFee: bridgeFee } = await oftContract.quoteSend(sendParam, false)
-
-    let resetAllowanceTx
-
-    if (chainId === 1 && token.toLowerCase() === USDT) {
-      resetAllowanceTx = {
-        to: token,
-        value: 0,
-        data: await tokenContract.interface.encodeFunctionData('approve', [oftContract.target, 0])
-      }
-    }
-
-    const approveTx = {
-      to: token,
-      value: 0,
-      data: await tokenContract.interface.encodeFunctionData('approve', [oftContract.target, amount])
-    }
 
     const fee = { nativeFee: bridgeFee, lzTokenFee: 0 }
 
@@ -309,12 +234,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
       data: oftContract.interface.encodeFunctionData('send', [sendParam, fee, address])
     }
 
-    return {
-      resetAllowanceTx,
-      approveTx,
-      oftTx,
-      bridgeFee
-    }
+    return { oftTx, bridgeFee }
   }
 
   /** @private */
