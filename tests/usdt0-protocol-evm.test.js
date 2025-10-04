@@ -156,7 +156,6 @@ describe('Usdt0ProtocolEvm', () => {
 
         account.quoteSendTransaction = jest.fn()
           .mockResolvedValueOnce({ fee: 12_345n })
-          .mockResolvedValueOnce({ fee: 12_345n })
       })
 
       test('should successfully quote a bridge operation', async () => {
