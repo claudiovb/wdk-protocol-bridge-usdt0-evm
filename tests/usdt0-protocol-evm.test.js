@@ -4,9 +4,9 @@ import { addressToBytes32 } from '@layerzerolabs/lz-v2-utilities'
 
 import * as ethers from 'ethers'
 
-import { WalletAccountEvm, WalletAccountReadOnlyEvm } from '@wdk/wallet-evm'
+import { WalletAccountEvm, WalletAccountReadOnlyEvm } from '@tetherto/wdk-wallet-evm'
 
-import { WalletAccountEvmErc4337, WalletAccountReadOnlyEvmErc4337 } from '@wdk/wallet-evm-erc-4337'
+import { WalletAccountEvmErc4337, WalletAccountReadOnlyEvmErc4337 } from '@tetherto/wdk-wallet-evm-erc-4337'
 
 import { OFT_ABI, TRANSACTION_VALUE_HELPER_ABI } from '../src/abi.js'
 

@@ -51,10 +51,10 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
     /** @private */
     private _getTransactionValueHelperContract;
 }
-export type BridgeProtocolConfig = import("@wdk/wallet/protocols").BridgeProtocolConfig;
-export type BridgeOptions = import("@wdk/wallet/protocols").BridgeOptions;
-export type WalletAccountReadOnlyEvm = import("@wdk/wallet-evm").WalletAccountReadOnlyEvm;
-export type EvmErc4337WalletConfig = import("@wdk/wallet-evm-erc-4337").EvmErc4337WalletConfig;
+export type BridgeProtocolConfig = import("@tetherto/wdk-wallet/protocols").BridgeProtocolConfig;
+export type BridgeOptions = import("@tetherto/wdk-wallet/protocols").BridgeOptions;
+export type WalletAccountReadOnlyEvm = import("@tetherto/wdk-wallet-evm").WalletAccountReadOnlyEvm;
+export type EvmErc4337WalletConfig = import("@tetherto/wdk-wallet-evm-erc-4337").EvmErc4337WalletConfig;
 export type Usdt0BridgeResult = {
     /**
      * - The hash of the swap operation.
@@ -75,7 +75,7 @@ export type Usdt0BridgeResult = {
      */
     approveHash?: string;
 };
-import { BridgeProtocol } from '@wdk/wallet/protocols';
-import { WalletAccountReadOnlyEvmErc4337 } from '@wdk/wallet-evm-erc-4337';
-import { WalletAccountEvm } from '@wdk/wallet-evm';
-import { WalletAccountEvmErc4337 } from '@wdk/wallet-evm-erc-4337';
+import { BridgeProtocol } from '@tetherto/wdk-wallet/protocols';
+import { WalletAccountReadOnlyEvmErc4337 } from '@tetherto/wdk-wallet-evm-erc-4337';
+import { WalletAccountEvm } from '@tetherto/wdk-wallet-evm';
+import { WalletAccountEvmErc4337 } from '@tetherto/wdk-wallet-evm-erc-4337';
