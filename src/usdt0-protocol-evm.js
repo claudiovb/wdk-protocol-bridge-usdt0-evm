@@ -14,9 +14,9 @@
 
 'use strict'
 
-import { BridgeProtocol } from '@wdk/wallet/protocols'
-import { WalletAccountEvm } from '@wdk/wallet-evm'
-import { WalletAccountEvmErc4337, WalletAccountReadOnlyEvmErc4337 } from '@wdk/wallet-evm-erc-4337'
+import { BridgeProtocol } from '@tetherto/wdk-wallet/protocols'
+import { WalletAccountEvm } from '@tetherto/wdk-wallet-evm'
+import { WalletAccountEvmErc4337, WalletAccountReadOnlyEvmErc4337 } from '@tetherto/wdk-wallet-evm-erc-4337'
 
 import { addressToBytes32, Options } from '@layerzerolabs/lz-v2-utilities'
 import { JsonRpcProvider, BrowserProvider, Contract, getBytes } from 'ethers'
@@ -25,12 +25,12 @@ import { TronWeb } from 'tronweb'
 
 import { OFT_ABI, TRANSACTION_VALUE_HELPER_ABI, ERC20_ABI } from './abi.js'
 
-/** @typedef {import('@wdk/wallet/protocols').BridgeProtocolConfig} BridgeProtocolConfig */
-/** @typedef {import('@wdk/wallet/protocols').BridgeOptions} BridgeOptions */
+/** @typedef {import('@tetherto/wdk-wallet/protocols').BridgeProtocolConfig} BridgeProtocolConfig */
+/** @typedef {import('@tetherto/wdk-wallet/protocols').BridgeOptions} BridgeOptions */
 
-/** @typedef {import('@wdk/wallet-evm').WalletAccountReadOnlyEvm} WalletAccountReadOnlyEvm */
+/** @typedef {import('@tetherto/wdk-wallet-evm').WalletAccountReadOnlyEvm} WalletAccountReadOnlyEvm */
 
-/** @typedef {import('@wdk/wallet-evm-erc-4337').EvmErc4337WalletConfig} EvmErc4337WalletConfig */
+/** @typedef {import('@tetherto/wdk-wallet-evm-erc-4337').EvmErc4337WalletConfig} EvmErc4337WalletConfig */
 
 /**
  * @typedef {Object} Usdt0BridgeResult
@@ -292,7 +292,7 @@ export default class Usdt0ProtocolEvm extends BridgeProtocol {
     }
 
     if (configuration.chainId === BLOCKCHAINS[targetChain].chainId) {
-      throw new Error(`The target chain cannot be equal to the source chain.`)
+      throw new Error('The target chain cannot be equal to the source chain.')
     }
 
     for (const key of ['oftContract', 'legacyMeshContract', 'xautOftContract']) {

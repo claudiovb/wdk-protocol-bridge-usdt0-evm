@@ -14,9 +14,9 @@
 
 'use strict'
 
-/** @typedef {import('@wdk/wallet/protocols').BridgeProtocolConfig} BridgeProtocolConfig */
+/** @typedef {import('@tetherto/wdk-wallet/protocols').BridgeProtocolConfig} BridgeProtocolConfig */
 
-/** @typedef {import('@wdk/wallet/protocols').BridgeOptions} BridgeOptions */
+/** @typedef {import('@tetherto/wdk-wallet/protocols').BridgeOptions} BridgeOptions */
 
 /** @typedef {import('./src/usdt0-protocol-evm.js').Usdt0BridgeResult} Usdt0BridgeResult */
 
