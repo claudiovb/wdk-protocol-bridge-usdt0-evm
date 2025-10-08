@@ -1,7 +1,7 @@
 {
-  "name": "@wdk/protocol-bridge-usdt0-evm",
+  "name": "@tetherto/wdk-protocol-bridge-usdt0-evm",
   "version": "1.0.0-beta.1",
-  "description": "A simple package that lets @wdk/wallet-evm and wallet-evm-erc-4337 wallet accounts interact with the usdt0 protocol.",
+  "description": "A simple package that lets @tetherto/wdk-wallet-evm and wallet-evm-erc-4337 wallet accounts interact with the usdt0 protocol.",
   "keywords": [
     "wdk",
     "protocol",
@@ -27,10 +27,10 @@
   },
   "dependencies": {
     "@layerzerolabs/lz-v2-utilities": "3.0.114",
+    "@tetherto/wdk-wallet": "^1.0.0-beta.1",
+    "@tetherto/wdk-wallet-evm": "^1.0.0-beta.2",
+    "@tetherto/wdk-wallet-evm-erc-4337": "^1.0.0-beta.1",
     "@ton/core": "0.61.0",
-    "@wdk/wallet": "https://github.com/davi0kprogramsthings/wdk-wallet#develop",
-    "@wdk/wallet-evm": "https://github.com/davi0kprogramsthings/wdk-wallet-evm#develop",
-    "@wdk/wallet-evm-erc-4337": "https://github.com/davi0kprogramsthings/wdk-wallet-evm-erc-4337#develop",
     "bare-wdk-runtime": "2.0.1",
     "ethers": "6.13.5",
     "tronweb": "6.0.3"
@@ -56,6 +56,10 @@
     "./package": {
       "default": "./package.json"
     }
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "registry": "https://registry.npmjs.org/"
   },
   "standard": {
     "ignore": [
