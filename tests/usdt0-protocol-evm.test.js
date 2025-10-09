@@ -16,6 +16,8 @@ const USER_ADDRESS = '0xa460AEbce0d3A4BecAd8ccf9D6D4861296c503Bd'
 
 const TOKEN = '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9'
 
+const getNetworkMock = jest.fn()
+
 const tokenMock = jest.fn()
 
 const quoteSendMock = jest.fn()
@@ -23,7 +25,7 @@ const quoteSendMock = jest.fn()
 jest.unstable_mockModule('ethers', () => ({
   ...ethers,
   JsonRpcProvider: jest.fn().mockImplementation(() => ({
-    getNetwork: jest.fn().mockResolvedValue({ chainId: 42_161n })
+    getNetwork: getNetworkMock
   })),
   Contract: jest.fn().mockImplementation((target, abi, provider) => {
     const contract = new ethers.Contract(target, abi, provider)
@@ -41,28 +43,22 @@ jest.unstable_mockModule('ethers', () => ({
 const { default: Usdt0ProtocolEvm } = await import('../index.js')
 
 describe('Usdt0ProtocolEvm', () => {
-  const DUMMY_SEND_PARAM = {
-    dstEid: 30_110,
-    to: addressToBytes32(USER_ADDRESS),
-    amountLD: 100n,
-    minAmountLD: 99n,
-    extraOptions: new Uint8Array([0, 3]),
-    composeMsg: new Uint8Array([ ]),
-    oftCmd: new Uint8Array([ ])
-  }
-
   let account,
       protocol
 
   describe('with WalletAccountEvm', () => {
-    const DUMMY_APPROVE_TRANSACTION = {
-      to: TOKEN,
-      value: 0,
-      data: '0x095ea7b300000000000000000000000014e4a1b13bf7f943c8ff7c51fb60fa964a298d920000000000000000000000000000000000000000000000000000000000000064'
+    const DUMMY_SEND_PARAM = {
+      dstEid: 30_110,
+      to: addressToBytes32(USER_ADDRESS),
+      amountLD: 100n,
+      minAmountLD: 99n,
+      extraOptions: new Uint8Array([0, 3]),
+      composeMsg: new Uint8Array([ ]),
+      oftCmd: new Uint8Array([ ])
     }
 
     const DUMMY_BRIDGE_TRANSACTION = {
-      to: '0x14E4A1B13bf7F943c8ff7C51fb60FA964A298D92',
+      to: '0x6C96dE32CEa08842dcc4058c14d3aaAD7Fa41dee',
       value: 10_000n,
       data: '0xc7c7f5b3000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000027100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a460aebce0d3a4becad8ccf9d6d4861296c503bd000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000a460aebce0d3a4becad8ccf9d6d4861296c503bd0000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000000000006300000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000002000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
     }
@@ -75,6 +71,8 @@ describe('Usdt0ProtocolEvm', () => {
       account.getAddress = jest.fn().mockResolvedValue(USER_ADDRESS)
 
       protocol = new Usdt0ProtocolEvm(account)
+
+      getNetworkMock.mockResolvedValue({ chainId: 1n })
     })
 
     describe('bridge', () => {
@@ -85,11 +83,9 @@ describe('Usdt0ProtocolEvm', () => {
 
         account.quoteSendTransaction = jest.fn()
           .mockResolvedValueOnce({ fee: 12_345n })
-          .mockResolvedValueOnce({ fee: 67_890n })
 
         account.sendTransaction = jest.fn()
-          .mockResolvedValueOnce({ hash: 'dummy-approve-hash', fee: 12_345n })
-          .mockResolvedValueOnce({ hash: 'dummy-bridge-hash', fee: 67_890n })
+          .mockResolvedValueOnce({ hash: 'dummy-bridge-hash', fee: 12_345n })
       })
 
       test('should successfully perform a bridge operation', async () => {
@@ -104,16 +100,13 @@ describe('Usdt0ProtocolEvm', () => {
 
         expect(quoteSendMock).toHaveBeenCalledWith(DUMMY_SEND_PARAM, false)
 
-        expect(account.quoteSendTransaction).toHaveBeenCalledWith(DUMMY_APPROVE_TRANSACTION)
         expect(account.quoteSendTransaction).toHaveBeenCalledWith(DUMMY_BRIDGE_TRANSACTION)
 
-        expect(account.sendTransaction).toHaveBeenCalledWith(DUMMY_APPROVE_TRANSACTION)
         expect(account.sendTransaction).toHaveBeenCalledWith(DUMMY_BRIDGE_TRANSACTION)
 
         expect(result).toEqual({
-          approveHash: 'dummy-approve-hash',
           hash: 'dummy-bridge-hash',
-          fee: 80_235n,
+          fee: 12_345n,
           bridgeFee: 10_000n
         })
       })
@@ -163,7 +156,6 @@ describe('Usdt0ProtocolEvm', () => {
 
         account.quoteSendTransaction = jest.fn()
           .mockResolvedValueOnce({ fee: 12_345n })
-          .mockResolvedValueOnce({ fee: 67_890n })
       })
 
       test('should successfully quote a bridge operation', async () => {
@@ -178,11 +170,10 @@ describe('Usdt0ProtocolEvm', () => {
 
         expect(quoteSendMock).toHaveBeenCalledWith(DUMMY_SEND_PARAM, false)
 
-        expect(account.quoteSendTransaction).toHaveBeenCalledWith(DUMMY_APPROVE_TRANSACTION)
         expect(account.quoteSendTransaction).toHaveBeenCalledWith(DUMMY_BRIDGE_TRANSACTION)
 
         expect(result).toEqual({
-          fee: 80_235n,
+          fee: 12_345n,
           bridgeFee: 10_000n
         })
       })
@@ -199,16 +190,20 @@ describe('Usdt0ProtocolEvm', () => {
   })
 
   describe('with WalletAccountEvmErc4337', () => {
-    const DUMMY_APPROVE_TRANSACTION = {
-      to: TOKEN,
-      value: 0,
-      data: '0x095ea7b3000000000000000000000000a90f03c856d01f698e7071b393387cd75a8a319a0000000000000000000000000000000000000000000000000000000000002b5c'
+    const DUMMY_SEND_PARAM = {
+      dstEid: 30_101,
+      to: addressToBytes32(USER_ADDRESS),
+      amountLD: 100n,
+      minAmountLD: 99n,
+      extraOptions: new Uint8Array([0, 3]),
+      composeMsg: new Uint8Array([ ]),
+      oftCmd: new Uint8Array([ ])
     }
 
     const DUMMY_BRIDGE_TRANSACTION = {
       to: '0xa90f03c856D01F698E7071B393387cd75a8a319A',
       value: 0,
-      data: '0x11bbdd1400000000000000000000000014e4a1b13bf7f943c8ff7c51fb60fa964a298d92000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000013880000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000759e000000000000000000000000a460aebce0d3a4becad8ccf9d6d4861296c503bd0000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000000000006300000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000002000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+      data: '0x11bbdd1400000000000000000000000014e4a1b13bf7f943c8ff7c51fb60fa964a298d920000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000138800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007595000000000000000000000000a460aebce0d3a4becad8ccf9d6d4861296c503bd0000000000000000000000000000000000000000000000000000000000000064000000000000000000000000000000000000000000000000000000000000006300000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000002000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
     }
 
     beforeEach(() => {
@@ -220,6 +215,8 @@ describe('Usdt0ProtocolEvm', () => {
       account.getAddress = jest.fn().mockResolvedValue(USER_ADDRESS)
 
       protocol = new Usdt0ProtocolEvm(account)
+
+      getNetworkMock.mockResolvedValue({ chainId: 42_161n })
     })
 
     describe('bridge', () => {
@@ -231,15 +228,15 @@ describe('Usdt0ProtocolEvm', () => {
           .mockResolvedValueOnce(10_000n)
 
         account.quoteSendTransaction = jest.fn()
-          .mockResolvedValueOnce({ fee: 80_235n })
+          .mockResolvedValueOnce({ fee: 12_345n })
 
         account.sendTransaction = jest.fn()
-          .mockResolvedValueOnce({ hash: 'dummy-user-operation-hash', fee: 80_235n })
+          .mockResolvedValueOnce({ hash: 'dummy-user-operation-hash', fee: 12_345n })
       })
 
       test('should successfully perform a bridge operation', async () => {
         const result = await protocol.bridge({
-          targetChain: 'arbitrum',
+          targetChain: 'ethereum',
           recipient: '0xa460AEbce0d3A4BecAd8ccf9D6D4861296c503Bd',
           token: TOKEN,
           amount: 100
@@ -250,20 +247,20 @@ describe('Usdt0ProtocolEvm', () => {
         expect(quoteSendMock).toHaveBeenCalledWith(DUMMY_SEND_PARAM, false)
         expect(quoteSendMock).toHaveBeenCalledWith(DUMMY_SEND_PARAM, [5_000n, 0n])
 
-        expect(account.quoteSendTransaction).toHaveBeenCalledWith([DUMMY_APPROVE_TRANSACTION, DUMMY_BRIDGE_TRANSACTION], undefined)
+        expect(account.quoteSendTransaction).toHaveBeenCalledWith([DUMMY_BRIDGE_TRANSACTION], undefined)
 
-        expect(account.sendTransaction).toHaveBeenCalledWith([DUMMY_APPROVE_TRANSACTION, DUMMY_BRIDGE_TRANSACTION], undefined)
+        expect(account.sendTransaction).toHaveBeenCalledWith([DUMMY_BRIDGE_TRANSACTION], undefined)
 
         expect(result).toEqual({
           hash: 'dummy-user-operation-hash',
-          fee: 80_235n,
+          fee: 12_345n,
           bridgeFee: 10_000n
         })
       })
 
       test('should throw if the bridge fee exceeds the bridge max fee configuration', async () => {
         const OPTIONS = {
-          targetChain: 'arbitrum',
+          targetChain: 'ethereum',
           recipient: '0xa460AEbce0d3A4BecAd8ccf9D6D4861296c503Bd',
           token: TOKEN,
           amount: 100
@@ -310,12 +307,12 @@ describe('Usdt0ProtocolEvm', () => {
           .mockResolvedValue(10_000n)
 
         account.quoteSendTransaction = jest.fn()
-          .mockResolvedValueOnce({ fee: 80_235n })
+          .mockResolvedValueOnce({ fee: 12_345n })
       })
 
       test('should successfully quote a bridge operation', async () => {
         const result = await protocol.quoteBridge({
-          targetChain: 'arbitrum',
+          targetChain: 'ethereum',
           recipient: '0xa460AEbce0d3A4BecAd8ccf9D6D4861296c503Bd',
           token: TOKEN,
           amount: 100
@@ -326,10 +323,10 @@ describe('Usdt0ProtocolEvm', () => {
         expect(quoteSendMock).toHaveBeenCalledWith(DUMMY_SEND_PARAM, false)
         expect(quoteSendMock).toHaveBeenCalledWith(DUMMY_SEND_PARAM, [5_000n, 0n])
 
-        expect(account.quoteSendTransaction).toHaveBeenCalledWith([DUMMY_APPROVE_TRANSACTION, DUMMY_BRIDGE_TRANSACTION], undefined)
+        expect(account.quoteSendTransaction).toHaveBeenCalledWith([DUMMY_BRIDGE_TRANSACTION], undefined)
 
         expect(result).toEqual({
-          fee: 80_235n,
+          fee: 12_345n,
           bridgeFee: 10_000n
         })
       })
