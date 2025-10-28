@@ -1,3 +1,11 @@
+---
+name: "General issue"
+about: "Use this template for bugs, features, or docs changes"
+title: ""
+labels: []
+assignees: []
+---
+
 ## I'm submitting a...
 
 - [ ] bug report
